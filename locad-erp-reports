@@ -1,0 +1,92 @@
+// LOCAD ERP FULL SYSTEM — Reports Module
+
+// ===========================
+// File: src/pages/Reports.jsx
+// ===========================
+import { useEffect, useState } from "react";
+import { getSheetData } from "../utils/sheetsAPI";
+import { exportToCSV } from "../utils/exportCSV";
+
+const sheetId = import.meta.env.VITE_SHEET_ID;
+const apiKey = import.meta.env.VITE_API_KEY;
+
+export default function Reports() {
+  const [inventory, setInventory] = useState([]);
+  const [sales, setSales] = useState([]);
+
+  useEffect(() => {
+    async function fetchData() {
+      const inv = await getSheetData(sheetId, apiKey, "Inventory!A1:E");
+      const sal = await getSheetData(sheetId, apiKey, "SalesOrders!A1:F");
+
+      const invData = inv.slice(1).map(row => ({
+        sku: row[0],
+        desc: row[1],
+        qty: parseInt(row[2] || 0),
+        location: row[3],
+        updated: row[4]
+      }));
+
+      const salesData = sal.slice(1).map(row => ({
+        order: row[0],
+        customer: row[1],
+        product: row[2],
+        qty: parseInt(row[3] || 0),
+        price: parseFloat(row[4] || 0),
+        status: row[5]
+      }));
+
+      setInventory(invData);
+      setSales(salesData);
+    }
+    fetchData();
+  }, []);
+
+  const totalSales = sales.reduce((sum, s) => sum + s.qty * s.price, 0).toFixed(2);
+  const totalSKUs = inventory.length;
+  const lowStock = inventory.filter(i => i.qty < 10);
+
+  return (
+    <div>
+      <h1 className="text-2xl font-bold mb-4">Reports</h1>
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="bg-green-100 p-4 rounded">
+          <h2 className="font-bold text-lg">Total SKUs</h2>
+          <p className="text-2xl">{totalSKUs}</p>
+        </div>
+        <div className="bg-green-100 p-4 rounded">
+          <h2 className="font-bold text-lg">Total Sales</h2>
+          <p className="text-2xl">₱{totalSales}</p>
+        </div>
+        <div className="bg-red-100 p-4 rounded">
+          <h2 className="font-bold text-lg">Low Stock Items</h2>
+          <p className="text-2xl">{lowStock.length}</p>
+        </div>
+      </div>
+
+      <h2 className="text-xl font-bold mb-2">Low Stock Items</h2>
+      <button onClick={() => exportToCSV([["SKU", "Description", "Qty", "Location"], ...lowStock.map(i => [i.sku, i.desc, i.qty, i.location])])} className="mb-4 px-4 py-2 bg-green-500 text-white">Export CSV</button>
+
+      <table className="table-auto w-full border">
+        <thead>
+          <tr className="bg-green-200">
+            <th className="border p-2">SKU</th>
+            <th className="border p-2">Description</th>
+            <th className="border p-2">QTY</th>
+            <th className="border p-2">Location</th>
+          </tr>
+        </thead>
+        <tbody>
+          {lowStock.map((item, index) => (
+            <tr key={index} className="even:bg-gray-100">
+              <td className="border p-2">{item.sku}</td>
+              <td className="border p-2">{item.desc}</td>
+              <td className="border p-2">{item.qty}</td>
+              <td className="border p-2">{item.location}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
